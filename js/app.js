@@ -342,7 +342,7 @@
         if (r.macros && r.macros.cal) { cal += r.macros.cal; prot += (r.macros.protein || 0); nDin++; }
         html += '<article class="mc"><button class="ph-btn" data-act="open-recipe" data-id="' + esc(r.id) + '" data-d="' + i + '" aria-label="Open ' + esc(r.name) + '">' + tile(r) + '</button><div class="mc-b"><button class="mc-t" data-act="open-recipe" data-id="' + esc(r.id) + '" data-d="' + i + '">' + esc(r.name) + '</button><small>' + esc(r.cuisine) + ' · ' + (r.time || '?') + ' min' + (macroLine(r) ? ' · ' + macroLine(r) : '') + '</small>' +
           '<div class="mrow"><div class="step"><button data-act="serv" data-d="' + i + '" data-n="-1" aria-label="Fewer servings">−</button><b>' + sv + '</b><button data-act="serv" data-d="' + i + '" data-n="1" aria-label="More servings">+</button></div>' +
-          '<div class="acts"><button class="ico' + (d.locked ? ' on' : '') + '" data-act="lock" data-d="' + i + '" aria-label="' + (d.locked ? 'Unlock' : 'Lock') + '">' + ic(d.locked ? 'lock' : 'unlock') + '</button><button class="ico" data-act="dice" data-d="' + i + '" aria-label="Pick another at random">' + ic('dice') + '</button><button class="ico" data-act="choose" data-d="' + i + '" aria-label="Choose a different dinner">' + ic('swap') + '</button></div></div></div></article>';
+          '<div class="acts"><button class="ico' + (d.locked ? ' on' : '') + '" data-act="lock" data-d="' + i + '" aria-label="' + (d.locked ? 'Unlock' : 'Lock') + '">' + ic(d.locked ? 'lock' : 'unlock') + '</button><button class="ico" data-act="dice" data-d="' + i + '" aria-label="Pick another at random">' + ic('dice') + '</button><button class="ico" data-act="choose" data-d="' + i + '" aria-label="Choose a different dinner">' + ic('swap') + '</button><button class="ico" data-act="day-clear" data-d="' + i + '" aria-label="Remove this dinner">' + ic('x') + '</button></div></div></div></article>';
         html += '<div class="sides">';
         (d.sides || []).forEach(function (sid) {
           var sr = recipe(sid); if (!sr) return;
@@ -436,7 +436,7 @@
   function chipsHtml(f, withFlags) {
     var st = settings(), h = '<div class="chips">';
     ['Dinner', 'Side', 'Dessert', ''].forEach(function (t) { h += '<button class="chip' + (f.type === t ? ' on' : '') + '" data-f="type" data-v="' + t + '">' + (t || 'All types') + '</button>'; });
-    h += '</div><div class="chips scroll"><button class="chip' + (!f.cuisine ? ' on' : '') + '" data-f="cuisine" data-v="">All</button>';
+    h += '</div><div class="chips wrap"><button class="chip' + (!f.cuisine ? ' on' : '') + '" data-f="cuisine" data-v="">All</button>';
     st.cuisines.forEach(function (c) { h += '<button class="chip' + (f.cuisine === c ? ' on' : '') + '" data-f="cuisine" data-v="' + esc(c) + '">' + esc(c) + '</button>'; });
     h += '</div>';
     if (withFlags) {
@@ -477,6 +477,7 @@
   A.dice = function (el) { rollDay(+el.dataset.d); };
   A.serv = function (el) { var i = +el.dataset.d, ws = planStart(), d = getDay(ws, i), n = Math.max(1, Math.min(12, (d.servings || settings().people) + (+el.dataset.n))); setDay(ws, i, { servings: n }); };
   A['out-clear'] = function (el) { setDay(planStart(), +el.dataset.d, { out: false, label: '' }); };
+  A['day-clear'] = function (el) { setDay(planStart(), +el.dataset.d, { recipeId: '', locked: false, sides: [], servings: null }); };
   A['side-rm'] = function (el) { var ws = planStart(), i = +el.dataset.d, d = getDay(ws, i); setDay(ws, i, { sides: (d.sides || []).filter(function (x) { return x !== el.dataset.id; }) }); };
   A['side-add'] = function (el) { openChooser(+el.dataset.d, 'side'); };
   A.choose = function (el) { openChooser(+el.dataset.d, 'main'); };
