@@ -197,3 +197,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #toast button{color:var(--lime);font-weight:800}
 @keyframes up{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.sec-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+.sec-row .sec{margin:18px 2px 8px}
+.opt{display:grid;gap:2px;width:100%;text-align:left;background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:8px}
+.opt b{font-size:17px}.opt small{color:var(--muted);font-weight:600}
+.err{background:#FBE3DF;color:#8A2A1D;border-radius:12px;padding:10px 12px;font-weight:600;margin:0 0 10px}
+.busy{display:grid;justify-items:center;gap:10px;padding:34px 10px;text-align:center}
+.busy small{color:var(--muted)}
+.spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--chip);border-top-color:var(--ink);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+textarea#ar-text{width:100%;background:#fff;border:0;border-radius:14px;padding:12px 14px;font-weight:500;min-height:180px;resize:vertical}

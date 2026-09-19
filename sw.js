@@ -1,6 +1,6 @@
 /* Service worker: makes the app open instantly and work with no signal. Bump VERSION when you change any file. */
-var VERSION = 'dp-v1';
-var SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/seed.js', 'js/store.js', 'js/app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+var VERSION = 'dp-v2';
+var SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/seed.js', 'js/store.js', 'js/ai.js', 'js/app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

@@ -238,11 +238,18 @@
   var rf = { q: '', type: 'Dinner', cuisine: '', flag: '' };
 
   // ---------- layers (sheets / pages) with back-button support ----------
-  var layers = [], skipPop = 0;
+  // Each open layer has one browser-history entry, so the phone's back button closes the top layer instead of leaving the app.
+  var layers = [], histDepth = 0, skipPop = 0, backing = false, histTimer = null;
+  function syncHist() {
+    clearTimeout(histTimer);
+    histTimer = setTimeout(function () {
+      if (histDepth > layers.length && !backing) { backing = true; skipPop++; try { history.back(); } catch (e) { backing = false; skipPop--; histDepth--; } }
+    }, 0);
+  }
   function openLayer(node, onClose) {
     document.body.appendChild(node);
     layers.push({ node: node, onClose: onClose });
-    try { history.pushState({ dp: 1 }, ''); } catch (e) { }
+    try { history.pushState({ dp: 1 }, ''); histDepth++; } catch (e) { }
     document.body.classList.add('noscroll');
   }
   function closeLayer(node) {
@@ -252,10 +259,11 @@
     l.node.remove();
     if (!layers.length) document.body.classList.remove('noscroll');
     if (l.onClose) l.onClose();
-    skipPop++; try { history.back(); } catch (e) { skipPop--; }
+    syncHist();
   }
   window.addEventListener('popstate', function () {
-    if (skipPop > 0) { skipPop--; return; }
+    if (skipPop > 0) { skipPop--; histDepth = Math.max(0, histDepth - 1); backing = false; if (histDepth > layers.length) syncHist(); return; }
+    histDepth = Math.max(0, histDepth - 1);
     if (layers.length) {
       var l = layers.pop(); l.node.remove();
       if (!layers.length) document.body.classList.remove('noscroll');
@@ -476,7 +484,7 @@
   A.tick = function (el) { var ws = planStart(), key = el.dataset.key; S.set('tick:' + ws + ':' + key, { done: !ticked(ws, key) }); };
   A['extra-tick'] = function (el) { var ws = planStart(), id = el.dataset.id, x = S.get('extra:' + ws + ':' + id); if (x) S.set('extra:' + ws + ':' + id, Object.assign({}, x, { done: !x.done })); };
   A['extra-del'] = function (el) { S.del('extra:' + planStart() + ':' + el.dataset.id); };
-  A['recipe-new'] = function () { openEditor(null); };
+  A['recipe-new'] = function () { openAddRecipe(); };
   A.settings = function () { openSettings(); };
   A['new-week'] = function () { openNewWeek(); };
   A['past-weeks'] = function () { openPastWeeks(); };
@@ -654,19 +662,21 @@
   }
 
   // ---------- recipe editor ----------
-  function compress(file, cb) {
+  function compress(file, cb, maxPx, q) {
     var img = new Image(), url = URL.createObjectURL(file);
     img.onload = function () {
-      var max = 900, sc = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      var max = maxPx || 900, sc = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
       c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url); cb(c.toDataURL('image/jpeg', 0.72));
+      URL.revokeObjectURL(url); cb(c.toDataURL('image/jpeg', q || 0.72));
     };
     img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
     img.src = url;
   }
-  function openEditor(id) {
-    var isNew = !id, base = id ? deepCopy(recipe(id)) : { id: 'r-' + uid(), name: '', cuisine: settings().cuisines[0] || 'Other', type: 'Dinner', time: 30, difficulty: 'Easy', serves: 2, macros: { cal: '', protein: '', carbs: '', fat: '' }, ingredients: [{ name: '', qty: '', unit: '', aisle: 'Fruit & veg' }], steps: [''], fav: false, photo: '' };
+  function openEditor(id, prefill) {
+    var isNew = !id, base = id ? deepCopy(recipe(id)) : Object.assign({ id: 'r-' + uid(), name: '', cuisine: settings().cuisines[0] || 'Other', type: 'Dinner', time: 30, difficulty: 'Easy', serves: 2, macros: { cal: '', protein: '', carbs: '', fat: '' }, ingredients: [{ name: '', qty: '', unit: '', aisle: 'Fruit & veg' }], steps: [''], fav: false, photo: '' }, prefill || {});
+    if (!base.ingredients || !base.ingredients.length) base.ingredients = [{ name: '', qty: '', unit: '', aisle: 'Fruit & veg' }];
+    if (!base.steps || !base.steps.length) base.steps = [''];
     var st = settings(), photo = base.photo || '';
     var node = makePage('');
     function opts(list, sel) { return list.map(function (o) { return '<option' + (o === sel ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join(''); }
@@ -684,7 +694,7 @@
       '<div class="two" id="ed-newrow" hidden><label class="fld">New name<input id="ed-newname" placeholder="Type a name"></label><span></span></div>' +
       '<div class="two"><label class="fld">Time (min)<input id="ed-time" inputmode="numeric" value="' + esc(base.time) + '"></label><label class="fld">Difficulty<select id="ed-diff">' + opts(['Easy', 'Medium', 'Hard'], base.difficulty) + '</select></label></div>' +
       '<label class="fld">Serves (the quantities below are for this many)<input id="ed-serves" inputmode="numeric" value="' + esc(base.serves || 2) + '"></label>' +
-      '<h3 class="sec">Macros per serving (optional)</h3><div class="four"><label class="fld">kcal<input id="ed-cal" inputmode="numeric" value="' + esc(m.cal) + '"></label><label class="fld">Protein g<input id="ed-pro" inputmode="numeric" value="' + esc(m.protein) + '"></label><label class="fld">Carbs g<input id="ed-carb" inputmode="numeric" value="' + esc(m.carbs) + '"></label><label class="fld">Fat g<input id="ed-fat" inputmode="numeric" value="' + esc(m.fat) + '"></label></div>' +
+      '<div class="sec-row"><h3 class="sec">Macros per serving (optional)</h3><button class="btn ghost sm" data-l="est">Estimate with AI</button></div><div class="four"><label class="fld">kcal<input id="ed-cal" inputmode="numeric" value="' + esc(m.cal) + '"></label><label class="fld">Protein g<input id="ed-pro" inputmode="numeric" value="' + esc(m.protein) + '"></label><label class="fld">Carbs g<input id="ed-carb" inputmode="numeric" value="' + esc(m.carbs) + '"></label><label class="fld">Fat g<input id="ed-fat" inputmode="numeric" value="' + esc(m.fat) + '"></label></div>' +
       '<h3 class="sec">Ingredients</h3><div id="ed-ings">' + base.ingredients.map(ingRow).join('') + '</div><button class="btn ghost" data-l="addi">' + ic('plus') + ' Add ingredient</button>' +
       '<h3 class="sec">Method</h3><div id="ed-steps">' + base.steps.map(stepRow).join('') + '</div><button class="btn ghost" data-l="adds">' + ic('plus') + ' Add step</button>' +
       (isNew ? '' : '<button class="btn danger wide" data-l="del">Delete recipe</button>') + '<div style="height:90px"></div></div>';
@@ -701,6 +711,18 @@
     function val(sel) { return $(sel, node).value.trim(); }
     function num(sel) { var v = parseFloat(val(sel)); return isFinite(v) ? v : ''; }
     bindLayer(node, {
+      est: function (t) {
+        if (!DPAI.hasKey()) { toast('Add your API key in Settings first'); openSettings(); return; }
+        var ings = [].slice.call(node.querySelectorAll('.ed-ing')).map(function (row) {
+          return { name: $('.i-n', row).value.trim(), qty: parseFloat($('.i-q', row).value) || 0, unit: $('.i-u', row).value.trim() };
+        }).filter(function (g) { return g.name; });
+        if (!ings.length) { toast('Add some ingredients first'); return; }
+        var old = t.textContent; t.textContent = 'Estimating\u2026'; t.disabled = true;
+        DPAI.macros(val('#ed-name'), num('#ed-serves') || 2, ings).then(function (m) {
+          $('#ed-cal', node).value = m.cal; $('#ed-pro', node).value = m.protein; $('#ed-carb', node).value = m.carbs; $('#ed-fat', node).value = m.fat;
+          toast('Estimated. Check the numbers look right');
+        }).catch(function (e) { toast(DPAI.friendly(e)); }).then(function () { t.textContent = old; t.disabled = false; });
+      },
       photo: function () { $('#ed-file', node).click(); },
       nophoto: function () { photo = ''; paintPhoto(); },
       addi: function () { $('#ed-ings', node).insertAdjacentHTML('beforeend', ingRow({ name: '', qty: '', unit: '', aisle: 'Fruit & veg' })); },
@@ -725,6 +747,8 @@
           else { type = newName; patch.types = st.types.concat([newName]); }
         }
         if (cuisine === '__new') cuisine = 'Other';
+        if (st.cuisines.indexOf(cuisine) < 0 && !patch.cuisines) patch.cuisines = st.cuisines.concat([cuisine]);
+        if (st.types.indexOf(type) < 0 && !patch.types) patch.types = st.types.concat([type]);
         var ings = [].slice.call(node.querySelectorAll('.ed-ing')).map(function (row) {
           var q = parseFloat($('.i-q', row).value);
           return { name: $('.i-n', row).value.trim(), qty: isFinite(q) ? q : 0, unit: $('.i-u', row).value.trim(), aisle: $('.i-a', row).value };
@@ -739,6 +763,50 @@
         saveRecipe(rec);
         closeLayer(node); toast(isNew ? 'Recipe added' : 'Recipe saved');
       }
+    });
+  }
+
+  // ---------- add a recipe (type it, paste text, or photograph it) ----------
+  function openAddRecipe() {
+    var ai = DPAI.hasKey(), st = settings();
+    var n = makeSheet('');
+    var sheet = $('.sheet', n);
+    function options(msg) {
+      sheet.innerHTML = '<div class="sh-h"><h3 class="disp">Add a recipe</h3><button class="ico" data-l="close" aria-label="Close">' + ic('x') + '</button></div>' +
+        (msg ? '<p class="err">' + esc(msg) + '</p>' : '') +
+        '<button class="opt" data-l="typed"><b>Type it in</b><small>Fill in the recipe yourself</small></button>' +
+        '<button class="opt" data-l="paste"><b>Paste recipe text</b><small>' + (ai ? 'Copy a recipe from a website or message and Claude sets it up' : 'Needs your API key in Settings') + '</small></button>' +
+        '<button class="opt" data-l="photo"><b>Photo of a recipe</b><small>' + (ai ? 'Snap a cookbook page or screenshot' : 'Needs your API key in Settings') + '</small></button>' +
+        '<input type="file" id="ar-file" accept="image/*" hidden>';
+    }
+    function busy(text) { sheet.innerHTML = '<div class="busy"><div class="spin"></div><b>' + esc(text) + '</b><small>This can take 10 to 20 seconds.</small></div>'; }
+    function done(rec) { closeLayer(n); openEditor(null, rec); toast('Check it over, then tap Save'); }
+    function fail(e) { options(DPAI.friendly(e)); }
+    function needKey() { closeLayer(n); toast('Add your API key in Settings first'); openSettings(); }
+    options(); openLayer(n);
+    n.addEventListener('change', function (e) {
+      if (e.target.id !== 'ar-file' || !e.target.files[0]) return;
+      busy('Reading the recipe…');
+      compress(e.target.files[0], function (d) {
+        if (!d) { options('Could not read that photo.'); return; }
+        DPAI.fromImage(d, window.DP_AISLES, st.cuisines).then(done).catch(fail);
+      }, 1600, 0.8);
+    });
+    bindLayer(n, {
+      typed: function () { closeLayer(n); openEditor(null); },
+      paste: function () {
+        if (!ai) return needKey();
+        sheet.innerHTML = '<div class="sh-h"><h3 class="disp">Paste a recipe</h3><button class="ico" data-l="back" aria-label="Back">' + ic('back') + '</button></div><label class="fld">Recipe text<textarea id="ar-text" rows="9" placeholder="Paste the ingredients and method here"></textarea></label><button class="btn dark wide" data-l="go">Create recipe</button>';
+        setTimeout(function () { var t = $('#ar-text', n); if (t) t.focus(); }, 50);
+      },
+      back: function () { options(); },
+      go: function () {
+        var txt = $('#ar-text', n).value.trim();
+        if (txt.length < 30) { toast('Paste a bit more of the recipe'); return; }
+        busy('Turning it into a recipe…');
+        DPAI.fromText(txt, window.DP_AISLES, st.cuisines).then(done).catch(fail);
+      },
+      photo: function () { if (!ai) return needKey(); $('#ar-file', n).click(); }
     });
   }
 
@@ -799,9 +867,17 @@
       var st = S.status(), label = { ok: 'Up to date', syncing: 'Syncing…', offline: 'Offline. Changes sync when you are back online', error: 'Could not reach the database. Will keep trying', off: 'Off' }[st];
       return h + '<div class="card pad"><small class="muted">Household code</small><div class="code">' + esc(S.code()) + '</div><p class="muted tiny">' + label + '</p></div><div class="btnrow"><button class="btn dark" data-l="hh-link">Copy invite link</button><button class="btn ghost" data-l="hh-leave">Leave</button></div>';
     }
+    function aiBlock() {
+      var h = '<h3 class="sec">AI helper (optional)</h3>';
+      h += '<p class="muted tiny">Lets you paste a recipe or photograph one, and estimate macros. It uses your own Anthropic API key, saved on this phone only and never synced. Each use costs a few pence at most. Set a spending limit on your Anthropic account.</p>';
+      h += '<label class="fld">API key<input id="s-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="sk-ant-..." value="' + esc(DPAI.key()) + '"></label>';
+      h += '<label class="fld">Model<select id="s-model">' + DPAI.models.map(function (m) { return '<option value="' + m[0] + '"' + (m[0] === DPAI.model() ? ' selected' : '') + '>' + esc(m[1]) + '</option>'; }).join('') + '</select></label>';
+      h += '<div class="btnrow"><button class="btn ghost" data-l="ai-test">Test key</button><button class="btn ghost" data-l="ai-clear">Remove key</button></div>';
+      return h;
+    }
     function paint() {
       var st = settings();
-      sheet.innerHTML = '<div class="sh-h"><h3 class="disp">Settings</h3><button class="ico" data-l="close" aria-label="Close">' + ic('x') + '</button></div>' + syncBlock() +
+      sheet.innerHTML = '<div class="sh-h"><h3 class="disp">Settings</h3><button class="ico" data-l="close" aria-label="Close">' + ic('x') + '</button></div>' + syncBlock() + aiBlock() +
         '<h3 class="sec">Planning</h3><div class="two"><label class="fld">People (default servings)<input id="s-people" inputmode="numeric" value="' + st.people + '"></label><label class="fld">Avoid repeats for (weeks)<input id="s-avoid" inputmode="numeric" value="' + st.avoidWeeks + '"></label></div>' +
         '<div class="two"><label class="fld">High protein from (g)<input id="s-pro" inputmode="numeric" value="' + st.proteinTarget + '"></label><label class="fld">Lighter up to (kcal)<input id="s-cal" inputmode="numeric" value="' + st.calTarget + '"></label></div>' +
         '<h3 class="sec">Categories</h3><div class="chips wrap">' + st.cuisines.map(function (c) { var used = R().list.some(function (r) { return r.cuisine === c; }); return '<span class="chip on2">' + esc(c) + (used ? '' : '<button data-l="rm-c" data-v="' + esc(c) + '" aria-label="Remove ' + esc(c) + '">' + ic('x') + '</button>') + '</span>'; }).join('') + '</div>' +
@@ -820,7 +896,11 @@
       if ((x = g('#s-cal')) !== null) p.calTarget = x;
       saveSettings(p);
     }
-    n.addEventListener('change', function (e) { if (/^s-(people|avoid|pro|cal)$/.test(e.target.id)) saveNums(); });
+    n.addEventListener('change', function (e) {
+      if (/^s-(people|avoid|pro|cal)$/.test(e.target.id)) saveNums();
+      if (e.target.id === 's-key') { DPAI.setKey(e.target.value.trim()); toast(e.target.value.trim() ? 'Key saved on this phone' : 'Key removed'); }
+      if (e.target.id === 's-model') DPAI.setModel(e.target.value);
+    });
     n.addEventListener('submit', function (e) {
       e.preventDefault();
       if (e.target.id === 's-addc') { var v = $('#s-newc', n).value.trim(); if (v && settings().cuisines.indexOf(v) < 0) { saveSettings({ cuisines: settings().cuisines.concat([v]) }); paint(); } }
@@ -829,6 +909,13 @@
     var refresh = function (w) { if (n.isConnected && w === 'status') paint(); };
     S.onChange(refresh);
     bindLayer(n, {
+      'ai-test': function (t) {
+        DPAI.setKey($('#s-key', n).value.trim());
+        if (!DPAI.hasKey()) { toast('Paste your API key first'); return; }
+        var old = t.textContent; t.textContent = 'Testing\u2026'; t.disabled = true;
+        DPAI.test().then(function () { toast('Key works'); }).catch(function (e) { toast(DPAI.friendly(e)); }).then(function () { t.textContent = old; t.disabled = false; });
+      },
+      'ai-clear': function () { DPAI.setKey(''); $('#s-key', n).value = ''; toast('Key removed from this phone'); },
       'rm-c': function (t) { saveSettings({ cuisines: settings().cuisines.filter(function (c) { return c !== t.dataset.v; }) }); paint(); },
       'rm-t': function (t) { saveSettings({ types: settings().types.filter(function (c) { return c !== t.dataset.v; }) }); paint(); },
       'hh-new': function () { var c = S.newCode(); S.setCode(c); paint(); toast('Household started. Copy the invite link for your wife'); },

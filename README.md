@@ -10,6 +10,7 @@ Everything is plain HTML, CSS and JavaScript. There is nothing to build or insta
 - **No boring weeks**: the shuffle never repeats a dish in the same week, never puts the same category on two nights in a row, and avoids anything you cooked in the last few weeks (you can change how many in Settings).
 - **Shopping list**: built from the week, grouped by aisle, duplicates merged (two recipes needing onions become one line). Tick things off in the shop. Add your own extras (milk, bin bags) and they are kept separate and tagged EXTRA.
 - **Recipes**: 65 starter recipes from your cheat sheet, all editable. Add photos, macros, your own categories (Greek, Breakfast, whatever) and your own recipe types (Dessert, Side).
+- **AI helper (optional)**: paste a recipe from a website or message, or photograph a cookbook page, and it becomes a proper recipe you can check and save. One tap also estimates the macros. See step 5 below.
 - **Cook mode**: one step at a time in big text, with the ingredients for that step, and the screen stays awake.
 - **New week**: clears the dinners and the shopping list, keeps the old week in Past weeks, and can carry over any unticked extras.
 
@@ -46,6 +47,15 @@ At this point the app works on each phone on its own. The next step makes the tw
 
 **Treat the invite link like a password.** The household code inside it is the only thing protecting your data. Don't post it anywhere public. Anyone who doesn't have the code cannot read or change anything, even if they find the database key.
 
+### 5. Optional: switch on the AI helper
+
+1. Go to [console.anthropic.com](https://console.anthropic.com), sign in, add a little credit (a few pounds lasts a very long time) and create an **API key** under **API keys**. Set a **spending limit** on the account.
+2. In the app, tap the cog, find **AI helper**, paste the key and tap **Test key**. You should see "Key works".
+3. Now **Recipes**, then **Add** offers **Paste recipe text** and **Photo of a recipe**, and the recipe editor has an **Estimate with AI** button next to the macros.
+4. Do this on each phone that should use it. The key is saved on that phone only. It is never synced and never stored in this repository.
+
+Pasted text or photos are sent to Anthropic to be read, and nothing else in the app is sent anywhere. Always check what it produced before you save: quantities and macros are estimates.
+
 ## Good to know
 
 - **Photos** are shrunk to a sensible size on the phone before saving, and stored in your database. The free Supabase plan has plenty of room for hundreds of dish photos.
@@ -63,6 +73,7 @@ At this point the app works on each phone on its own. The next step makes the tw
 | `css/style.css` | How it looks |
 | `js/app.js` | Screens and behaviour |
 | `js/store.js` | Saving on the phone and syncing between phones |
+| `js/ai.js` | The optional AI helper (paste, photo, macros) |
 | `js/seed.js` | The 65 starter recipes |
 | `js/config.js` | Where you paste the Supabase URL and key |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Makes it installable and lets it work offline |
