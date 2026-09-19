@@ -2,6 +2,6 @@
    To sync two phones: create a free Supabase project (see README.md), then paste the two values below.
    The "anon" key is meant to be public. Your data is protected by the secret household code, not by this key. */
 window.DP_CONFIG = {
-  url: '',      // e.g. 'https://abcdxyz.supabase.co'
-  anonKey: ''   // the long "anon public" key from Supabase > Project Settings > API
+  url: 'https://whkolxpbfnazwwvegnjv.supabase.co',
+  anonKey: 'sb_publishable_Q6GTdpwhZQT_VKvmwnkJAQ_qVjf_gpV'
 };
